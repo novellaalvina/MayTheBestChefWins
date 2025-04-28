@@ -24,5 +24,8 @@ actions = Action.ALL_ACTIONS
 while not done:
     action_0 = actions[0]
     action_1 = actions[0]
+    print(obs)
     obs, reward, done, info = env.step((action_0, action_1))
     print("Reward:", reward)
+
+    print(len(obs.to_dict()))
