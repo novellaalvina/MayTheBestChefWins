@@ -17,39 +17,14 @@ VALUE_LR = 1e-3
 STEPS_PER_ROLLOUT = 2048
 EPOCHS_PER_UPDATE = 10
 MINIBATCH_SIZE = 256
-TOTAL_TIMESTEPS = 1_000_000
+TOTAL_TIMESTEPS = 100_000
 
 # --- Environment Setup ---
-# mdp = OvercookedGridworld.from_layout_name("cramped_room")
-# env = OvercookedEnv.from_mdp(mdp, horizon=HORIZON)
-
 mdp_fn = lambda info=None: OvercookedGridworld.from_layout_name("cramped_room")
-env = OvercookedEnv(mdp_fn, horizon=400)
+env = OvercookedEnv(mdp_fn, horizon=HORIZON)
 
-
-# ACTIONS = ["north", "south", "east", "west", "stay", "interact"]
 ACTIONS = Action.ALL_ACTIONS
-
-# obs_dim = env.mdp.get_standard_state_shape()[0]
-obs_dim = 5 # when in dictionary form there are 5 items in the state
-obs = env.reset()
-print(obs)
-
-# action_0 = ACTIONS[0]
-# action_1 = ACTIONS[0]
-# print(obs)
-# obs, reward, done, info = env.step((action_0, action_1))
-# print(obs)
-
-# action_0 = ACTIONS[0]
-# action_1 = ACTIONS[0]
-# print(obs)
-# obs, reward, done, info = env.step((action_0, action_1))
-
-
-# obs_example = env.mdp.featurize_state(env.state, 0)  # for agent 0
-# obs_dim = len(obs_example)
-obs_dim = 5
+obs_dim = 5  # the Overcooked symbolic obs dictionary size
 n_actions = len(ACTIONS)
 
 # --- Policy and Value Networks ---
@@ -129,14 +104,9 @@ def compute_gae(rewards, values, dones, gamma=GAMMA, lam=LAMBDA):
     return advantages, returns
 
 # --- Training Loop ---
-env.reset()
-state = env.state
-# obs, reward, done, info = env.step(((0, 0), (0, 0)))
-# print(obs)
-# obs_agent0 = env.mdp.featurize_state(state, 0)
-# obs_agent1 = env.mdp.featurize_state(state, 1)
-test = env.featurize_state_mdp(state)
-print(env.featurize_state_mdp(state))
+obs = env.reset()
+obs_agent0 = env.mdp.featurize_state(env.state, 0)
+obs_agent1 = env.mdp.featurize_state(env.state, 1)
 
 timesteps = 0
 
@@ -154,11 +124,9 @@ while timesteps < TOTAL_TIMESTEPS:
         joint_action = (symbolic_action0, symbolic_action1)
 
         next_state, reward, done, info = env.step(joint_action)
-
-        next_obs_agent0 = env.mdp.featurize_state(env.state, 0)
-        next_obs_agent1 = env.mdp.featurize_state(env.state, 1)
-        # obs_agent0 = obs[0]  # Agent 0's observation
-        # obs_agent1 = obs[1]  # Agent 1's observation
+        obs = env.mdp.get_observation(next_state)
+        obs_agent0 = obs[0]
+        obs_agent1 = obs[1]
 
         buffer_agent0.obs.append(obs_agent0)
         buffer_agent0.actions.append(action_idx0)
@@ -174,14 +142,13 @@ while timesteps < TOTAL_TIMESTEPS:
         buffer_agent1.dones.append(done)
         buffer_agent1.values.append(value1)
 
-        obs_agent0 = next_obs_agent0
-        obs_agent1 = next_obs_agent1
         timesteps += 1
 
         if done:
             obs = env.reset()
-            obs_agent0 = env.mdp.featurize_state(env.state, 0)
-            obs_agent1 = env.mdp.featurize_state(env.state, 1)
+            obs = env.mdp.get_observation(env.state)
+            obs_agent0 = obs[0]
+            obs_agent1 = obs[1]
 
     # Compute advantages and returns for both agents
     advantages0, returns0 = compute_gae(buffer_agent0.rewards, buffer_agent0.values, buffer_agent0.dones)
